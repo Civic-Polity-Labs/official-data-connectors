@@ -1,0 +1,98 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "official-data-connectors"
+version = "1.0.0"
+description = "Extensible, streaming-first connectors for official statistical data"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Civic Polity Labs" }]
+keywords = ["official-data", "ine", "eurostat", "statistics", "open-data"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "ijson>=3.3,<4",
+  "lxml>=5,<7",
+  "pydantic>=2.7,<3",
+  "python-dateutil>=2.9,<3",
+  "requests>=2.31,<3",
+  "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=18,<24"]
+dev = [
+  "build>=1.2,<2",
+  "mypy>=1.15,<2",
+  "pip-audit>=2.8,<3",
+  "pytest>=8.3,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.11,<1",
+  "twine>=6,<7",
+  "types-python-dateutil>=2.9",
+  "types-requests>=2.32",
+]
+
+[project.urls]
+Homepage = "https://github.com/Civic-Polity-Labs/official-data-connectors"
+Documentation = "https://github.com/Civic-Polity-Labs/official-data-connectors#readme"
+Issues = "https://github.com/Civic-Polity-Labs/official-data-connectors/issues"
+Source = "https://github.com/Civic-Polity-Labs/official-data-connectors"
+
+[project.scripts]
+official-data = "official_data.cli:app"
+
+[project.entry-points."official_data.sources"]
+ine = "official_data.ine:IneApiClient"
+eurostat = "official_data.eurostat:EurostatApiClient"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/official_data"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "MIGRATION.md", "LICENSE"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/official_data/ine.py" = ["RUF100"]
+"src/official_data/eurostat.py" = ["RUF100"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["official_data.client", "official_data.models", "official_data.registry"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = [
+  "src/official_data/models.py",
+  "src/official_data/protocols.py",
+  "src/official_data/registry.py",
+]
+follow_imports = "silent"
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
