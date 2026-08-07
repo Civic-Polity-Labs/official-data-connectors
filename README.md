@@ -34,3 +34,5 @@ not a lossy replacement. This package only acquires, preserves, validates and
 normalizes official data.
 
 Licensed under MIT.
+
+Release setup: see [PUBLISHING.md](PUBLISHING.md).
