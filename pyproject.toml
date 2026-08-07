@@ -92,6 +92,7 @@ files = [
   "src/official_data/models.py",
   "src/official_data/protocols.py",
   "src/official_data/registry.py",
+  "src/official_data/client.py",
 ]
 follow_imports = "silent"
 ignore_missing_imports = true

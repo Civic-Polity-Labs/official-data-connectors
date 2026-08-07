@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: python -m pip install --upgrade pip build twine pip-audit
+      - run: python -m pip install --upgrade pip "setuptools>=83" build twine pip-audit
       - run: python -m build
       - run: twine check dist/*
       - run: python -m pip_audit
