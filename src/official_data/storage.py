@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import hashlib
 import io
 import json
@@ -11,6 +12,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import ijson
 from lxml import etree
 
 from official_data.catalog import DatasetResource
@@ -132,21 +134,11 @@ def bronze_payload_is_valid(
     try:
         if path.stat().st_size != manifest.bytes:
             return False
-        if manifest.format.casefold() == "pdf":
-            with path.open("rb") as handle:
-                header = handle.read(1_024)
-            if b"%PDF-" not in header:
-                return False
-            return not verify_checksum or _sha256_path(path) == manifest.sha256
-        content = path.read_bytes()
+        if not _path_matches_format_contract(path, manifest.format):
+            return False
     except OSError:
         return False
-    if verify_checksum and hashlib.sha256(content).hexdigest() != manifest.sha256:
-        return False
-    return content_matches_format_contract(
-        content=content,
-        format_name=manifest.format,
-    )
+    return not verify_checksum or _sha256_path(path) == manifest.sha256
 
 
 def content_matches_format_contract(*, content: bytes, format_name: str) -> bool:
@@ -491,4 +483,67 @@ def _path_matches_format_contract(path: Path, format_name: str) -> bool:
     if normalized == "pdf":
         with path.open("rb") as handle:
             return b"%PDF-" in handle.read(1_024)
-    return content_matches_format_contract(content=path.read_bytes(), format_name=format_name)
+    if normalized == "json":
+        try:
+            with path.open("rb") as handle:
+                events = ijson.parse(handle)
+                first_event = next(events, None)
+                if first_event is None or first_event[1] not in {"start_array", "start_map"}:
+                    return False
+                for _ in events:
+                    pass
+            return True
+        except (ijson.JSONError, OSError, UnicodeError, ValueError):
+            return False
+    if normalized in {"csv", "tsv", "csv.gz"}:
+        try:
+            opener = gzip.open if normalized == "csv.gz" else Path.open
+            delimiter = "\t" if normalized == "tsv" else ","
+            if normalized == "csv.gz":
+                handle = opener(path, "rt", encoding="utf-8-sig", newline="")
+            else:
+                handle = opener(path, "r", encoding="utf-8-sig", newline="")
+            with handle:
+                reader = csv.reader(handle, delimiter=delimiter)
+                header = next(reader, None)
+                if not header or len(header) < 1:
+                    return False
+                return all(len(row) == len(header) for row in reader if any(row))
+        except (csv.Error, OSError, UnicodeError):
+            return False
+    if normalized == "xml":
+        try:
+            for _, element in etree.iterparse(str(path), events=("end",), recover=False):
+                element.clear()
+            return True
+        except (etree.XMLSyntaxError, OSError, ValueError):
+            return False
+    if normalized in {"html", "htm"}:
+        size = path.stat().st_size
+        with path.open("rb") as handle:
+            head = handle.read(min(size, 1024 * 1024))
+            tail = b""
+            if size > len(head):
+                handle.seek(max(0, size - 1024 * 1024))
+                tail = handle.read(1024 * 1024)
+        return content_matches_format_contract(content=head + tail, format_name=format_name)
+    if normalized == "zip":
+        try:
+            with zipfile.ZipFile(path) as archive:
+                names = archive.namelist()
+                return bool(names) and all(
+                    not name.startswith(("/", "\\")) and ".." not in Path(name).parts
+                    for name in names
+                )
+        except (OSError, zipfile.BadZipFile):
+            return False
+    if normalized == "png":
+        try:
+            from PIL import Image
+
+            with Image.open(path) as image:
+                image.verify()
+            return True
+        except (ImportError, OSError, ValueError):
+            return False
+    return path.stat().st_size > 0

@@ -59,7 +59,7 @@ eurostat = "official_data.eurostat:EurostatApiClient"
 packages = ["src/official_data"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "README.md", "MIGRATION.md", "LICENSE"]
+include = ["src", "tests", "docs", "README.md", "MIGRATION.md", "LICENSE"]
 
 [tool.ruff]
 target-version = "py311"
@@ -79,10 +79,10 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["official_data.client", "official_data.models", "official_data.registry"]
+source = ["official_data"]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 65
 show_missing = true
 
 [tool.mypy]

@@ -33,6 +33,9 @@ Provider-native INE and Eurostat records are retained. `Observation` is a common
 not a lossy replacement. This package only acquires, preserves, validates and
 normalizes official data.
 
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for ownership and extension rules,
+and [`docs/TESTING.md`](docs/TESTING.md) for the full-distribution gate.
+
 Licensed under MIT.
 
 Release setup: see [PUBLISHING.md](PUBLISHING.md).

@@ -4,6 +4,8 @@ import hashlib
 import json
 from datetime import UTC, datetime
 
+import pytest
+
 from official_data.client import (
     EurostatConnector,
     IneConnector,
@@ -148,3 +150,13 @@ def test_official_client_delegates_to_injected_connector(tmp_path) -> None:
     assert tuple(client.extract(plan)) == ()
     assert tuple(client.native_observations(())) == ()
     assert next(client.observations(())).value == 1
+
+
+def test_official_client_rejects_a_plan_for_another_root(tmp_path) -> None:
+    client = OfficialDataClient(
+        "custom",
+        output_root=tmp_path / "client",
+        connector=CustomConnector(),
+    )
+    with pytest.raises(ValueError, match="must match"):
+        tuple(client.extract(OfficialExtractionPlan(output_root=tmp_path / "plan")))

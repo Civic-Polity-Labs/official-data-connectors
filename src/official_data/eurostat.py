@@ -17,7 +17,7 @@ from dateutil import parser as date_parser
 
 from official_data.catalog import DatasetResource
 from official_data.durable_io import write_json_atomically
-from official_data.http import CongresoHttpClient, FetchResult, StreamFetchResult
+from official_data.http import FetchResult, OfficialDataHttpClient, StreamFetchResult
 from official_data.normalization import normalize_key, stable_id
 from official_data.storage import (
     BronzeManifest,
@@ -74,10 +74,10 @@ class EurostatApiClient:
         self,
         *,
         language: str = EUROSTAT_LANGUAGE,
-        http_client: CongresoHttpClient | None = None,
+        http_client: OfficialDataHttpClient | None = None,
     ) -> None:
         self.language = language
-        self.http_client = http_client or CongresoHttpClient(
+        self.http_client = http_client or OfficialDataHttpClient(
             timeout_seconds=180,
             max_retries=4,
             sleep_seconds=1.2,
@@ -714,7 +714,7 @@ def eurostat_dataset_data_snapshot_token(dataset_code: str) -> str:
     return _snapshot_token("dataset-data", dataset_code)
 
 
-def eurostat_catalog_silver_rows(
+def eurostat_catalog_normalized_records(
     content: bytes,
     *,
     snapshot_date: str,
@@ -722,14 +722,14 @@ def eurostat_catalog_silver_rows(
 ) -> dict[str, list[dict[str, Any]]]:
     rows = _read_tsv_rows(_decode_text(content))
     return {
-        "silver_eurostat_datasets": [
+        "datasets": [
             _dataset_row(row, snapshot_date=snapshot_date, source_file_sha256=source_file_sha256)
             for row in rows
         ]
     }
 
 
-def eurostat_codelist_inventory_silver_rows(
+def eurostat_codelist_inventory_normalized_records(
     content: bytes,
     *,
     snapshot_date: str,
@@ -737,14 +737,14 @@ def eurostat_codelist_inventory_silver_rows(
 ) -> dict[str, list[dict[str, Any]]]:
     rows = _read_tsv_rows(_decode_text(content))
     return {
-        "silver_eurostat_codelists": [
+        "codelists": [
             _codelist_row(row, snapshot_date=snapshot_date, source_file_sha256=source_file_sha256)
             for row in rows
         ]
     }
 
 
-def eurostat_toc_silver_rows(
+def eurostat_toc_normalized_records(
     content: bytes,
     *,
     snapshot_date: str,
@@ -752,7 +752,7 @@ def eurostat_toc_silver_rows(
 ) -> dict[str, list[dict[str, Any]]]:
     rows = _read_tsv_rows(_decode_text(content))
     return {
-        "silver_eurostat_toc": [
+        "toc": [
             _toc_row(
                 row,
                 ordinal=ordinal,
@@ -765,7 +765,7 @@ def eurostat_toc_silver_rows(
     }
 
 
-def eurostat_toc_xml_silver_rows(
+def eurostat_toc_xml_normalized_records(
     content: bytes,
     *,
     snapshot_date: str,
@@ -815,10 +815,10 @@ def eurostat_toc_xml_silver_rows(
             for key, value in candidate.items():
                 if existing.get(key) in (None, "") and value not in (None, ""):
                     existing[key] = value
-    return {"silver_eurostat_toc_metadata": list(rows_by_code.values())}
+    return {"toc_metadata": list(rows_by_code.values())}
 
 
-def eurostat_codelist_silver_rows(
+def eurostat_codelist_normalized_records(
     content: bytes,
     *,
     manifest: BronzeManifest,
@@ -828,7 +828,7 @@ def eurostat_codelist_silver_rows(
     codelist_code, version = _codelist_token_parts(manifest.snapshot_token)
     rows = _read_tsv_rows(_decode_text(content))
     return {
-        "silver_eurostat_codelist_values": [
+        "codelist_values": [
             _codelist_value_row(
                 row,
                 codelist_code=codelist_code,
@@ -842,7 +842,7 @@ def eurostat_codelist_silver_rows(
     }
 
 
-def eurostat_dataset_data_silver_rows(
+def eurostat_dataset_data_normalized_records(
     content: bytes,
     *,
     manifest: BronzeManifest,
@@ -866,13 +866,13 @@ def eurostat_dataset_data_silver_rows(
             )
         )
     return {
-        "silver_eurostat_dataset_columns": eurostat_dataset_column_silver_rows(
+        "dataset_columns": eurostat_dataset_column_normalized_records(
             dataset_code=dataset_code,
             columns=columns,
             snapshot_date=snapshot_date,
             source_file_sha256=source_file_sha256,
         ),
-        "silver_eurostat_observations": observations,
+        "observations": observations,
     }
 
 
@@ -880,7 +880,7 @@ def eurostat_dataset_code_from_manifest(manifest: BronzeManifest) -> str:
     return _dataset_code_from_manifest(manifest)
 
 
-def eurostat_dataset_column_silver_rows(
+def eurostat_dataset_column_normalized_records(
     *,
     dataset_code: str,
     columns: list[str],
@@ -899,7 +899,7 @@ def eurostat_dataset_column_silver_rows(
     ]
 
 
-def eurostat_observation_silver_row(
+def eurostat_observation_normalized_record(
     row: dict[str, Any],
     *,
     dataset_code: str,
@@ -914,7 +914,7 @@ def eurostat_observation_silver_row(
     )
 
 
-def eurostat_dataset_structure_silver_rows(
+def eurostat_dataset_structure_normalized_records(
     content: bytes,
     *,
     manifest: BronzeManifest,
@@ -925,7 +925,7 @@ def eurostat_dataset_structure_silver_rows(
     text = _decode_text(content)
     structure_id = "eurostat_structure_" + stable_id(dataset_code, source_file_sha256)
     return {
-        "silver_eurostat_dataset_structures": [
+        "dataset_structures": [
             {
                 "structure_id": structure_id,
                 "dataset_code": dataset_code,

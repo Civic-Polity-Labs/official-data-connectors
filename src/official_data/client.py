@@ -15,10 +15,10 @@ from official_data.eurostat import (
     EUROSTAT_CATALOG_DATASET,
     EUROSTAT_DATASET_DATA,
     EurostatApiClient,
+    eurostat_catalog_normalized_records,
     eurostat_catalog_payload_from_content,
-    eurostat_catalog_silver_rows,
     eurostat_dataset_code_from_manifest,
-    eurostat_observation_silver_row,
+    eurostat_observation_normalized_record,
     extract_eurostat_catalog_resource,
     extract_eurostat_dataset_batch,
 )
@@ -28,7 +28,7 @@ from official_data.ine import (
     IneApiClient,
     extract_ine_catalog_resource,
     extract_ine_table_data_batch,
-    ine_catalog_silver_rows,
+    ine_catalog_normalized_records,
     ine_series_observation_rows,
 )
 from official_data.models import (
@@ -105,6 +105,10 @@ class _BaseConnector:
         path = Path(manifest.payload_path)
         return path if path.is_absolute() else self.output_root / path
 
+    def _validate_plan_root(self, plan: OfficialExtractionPlan) -> None:
+        if plan.output_root.resolve() != self.output_root.resolve():
+            raise ValueError("OfficialExtractionPlan.output_root must match connector output_root")
+
 
 class IneConnector(_BaseConnector):
     name = "ine"
@@ -126,6 +130,7 @@ class IneConnector(_BaseConnector):
                 yield from self._catalog_manifest(manifest)
 
     def extract(self, plan: OfficialExtractionPlan) -> Iterator[ArtifactManifest]:
+        self._validate_plan_root(plan)
         catalog = extract_ine_catalog_resource(
             run_date=plan.run_date,
             output_root=plan.output_root,
@@ -159,17 +164,17 @@ class IneConnector(_BaseConnector):
 
     def _catalog_manifest(self, manifest: ArtifactManifest) -> Iterator[NativeCatalogRecord]:
         payload = json.loads(self._path(manifest).read_text("utf-8-sig"))
-        tables = ine_catalog_silver_rows(
+        records = ine_catalog_normalized_records(
             payload,
             snapshot_date=manifest.run_date,
             source_file_sha256=manifest.sha256,
         )
         source = manifest.source_ref()
-        for row in tables["silver_ine_operations"]:
+        for row in records["operations"]:
             yield IneOperation.model_validate({**row, "source": source})
-        for row in tables["silver_ine_tables"]:
+        for row in records["tables"]:
             yield IneTable.model_validate({**row, "source": source})
-        for row in tables["silver_ine_series"]:
+        for row in records["series"]:
             yield IneSeries.model_validate({**row, "source": source})
 
     def native_observations(
@@ -239,6 +244,7 @@ class EurostatConnector(_BaseConnector):
                 yield from self._catalog_manifest(manifest)
 
     def extract(self, plan: OfficialExtractionPlan) -> Iterator[ArtifactManifest]:
+        self._validate_plan_root(plan)
         catalog = extract_eurostat_catalog_resource(
             run_date=plan.run_date,
             output_root=plan.output_root,
@@ -265,12 +271,12 @@ class EurostatConnector(_BaseConnector):
 
     def _catalog_manifest(self, manifest: ArtifactManifest) -> Iterator[NativeCatalogRecord]:
         content = self._path(manifest).read_bytes()
-        rows = eurostat_catalog_silver_rows(
+        records = eurostat_catalog_normalized_records(
             content,
             snapshot_date=manifest.run_date,
             source_file_sha256=manifest.sha256,
-        )["silver_eurostat_datasets"]
-        for row in rows:
+        )["datasets"]
+        for row in records:
             yield EurostatCatalogItem.model_validate({**row, "source": manifest.source_ref()})
 
     def native_observations(
@@ -286,7 +292,7 @@ class EurostatConnector(_BaseConnector):
                 for row in csv.DictReader(handle):
                     if not any((value or "").strip() for value in row.values()):
                         continue
-                    native = eurostat_observation_silver_row(
+                    native = eurostat_observation_normalized_record(
                         row,
                         dataset_code=dataset_code,
                         snapshot_date=manifest.run_date,
@@ -350,6 +356,11 @@ class OfficialDataClient:
         yield from self.connector.catalog()
 
     def extract(self, plan: OfficialExtractionPlan) -> Iterator[ArtifactManifest]:
+        if plan.output_root.resolve() != self.output_root.resolve():
+            raise ValueError(
+                "OfficialExtractionPlan.output_root must match OfficialDataClient.output_root; "
+                "construct a client for the requested root"
+            )
         yield from self.connector.extract(plan)
 
     def native_observations(

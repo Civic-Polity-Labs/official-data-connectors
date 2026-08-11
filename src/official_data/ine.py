@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 from official_data.catalog import DatasetResource
 from official_data.durable_io import write_json_atomically
-from official_data.http import CongresoHttpClient, FetchResult
+from official_data.http import FetchResult, OfficialDataHttpClient
 from official_data.normalization import normalize_text, stable_id
 from official_data.storage import BronzeManifest, persist_bronze, read_bronze_manifest
 
@@ -36,10 +36,10 @@ class IneApiClient:
         self,
         *,
         language: str = INE_LANGUAGE,
-        http_client: CongresoHttpClient | None = None,
+        http_client: OfficialDataHttpClient | None = None,
     ) -> None:
         self.language = language
-        self.http_client = http_client or CongresoHttpClient(
+        self.http_client = http_client or OfficialDataHttpClient(
             headers={
                 "User-Agent": (
                     "cpl-data-foundry/0.1 (INE JSON API; https://www.ine.es/datosabiertos/)"
@@ -628,7 +628,7 @@ def _write_ine_batch_report(
     write_json_atomically(report_path, report, default=str)
 
 
-def ine_catalog_silver_rows(
+def ine_catalog_normalized_records(
     payload: dict[str, Any],
     *,
     snapshot_date: str,
@@ -684,16 +684,16 @@ def ine_catalog_silver_rows(
             )
         )
     return {
-        "silver_ine_operations": operation_rows,
-        "silver_ine_tables": table_rows,
-        "silver_ine_table_groups": group_rows,
-        "silver_ine_table_group_values": group_value_rows,
-        "silver_ine_series": series_rows,
-        "silver_ine_series_metadata_values": series_metadata_rows,
+        "operations": operation_rows,
+        "tables": table_rows,
+        "table_groups": group_rows,
+        "table_group_values": group_value_rows,
+        "series": series_rows,
+        "series_metadata_values": series_metadata_rows,
     }
 
 
-def ine_table_data_silver_rows(
+def ine_table_data_normalized_records(
     payload: dict[str, Any],
     *,
     snapshot_date: str,
@@ -734,9 +734,9 @@ def ine_table_data_silver_rows(
             )
         )
     return {
-        "silver_ine_series": series_rows,
-        "silver_ine_series_metadata_values": metadata_rows,
-        "silver_ine_observations": observation_rows,
+        "series": series_rows,
+        "series_metadata_values": metadata_rows,
+        "observations": observation_rows,
     }
 
 

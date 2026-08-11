@@ -17,6 +17,8 @@ Lakehouse publication, data-quality orchestration and serving remain in
 
 ## Local package gate
 
-On 2026-08-07: 9 tests passed; Ruff and public-contract mypy passed; measured contract
-coverage was 81.93%; wheel and sdist passed `twine check`; the wheel imported and its
-CLI ran beside `congreso-open-data` 1.0.0 in a clean environment.
+On 2026-08-08 the package-owned suite contains 51 tests, including migrated INE and
+Eurostat regressions plus provider-neutral HTTP and streaming storage contracts.
+Coverage is measured over the complete distribution and its migration floor is 65%
+with branches (66% measured). Ruff, strict mypy, package build, clean-wheel smoke and
+the foundry consumer suite form the release gate.
